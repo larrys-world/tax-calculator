@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import RelatedTools from './RelatedTools';
 
 export default function TaxCalculator() {
   const [income, setIncome] = useState('');
@@ -183,6 +184,9 @@ export default function TaxCalculator() {
             <p>* Consult a tax professional for personalized advice.</p>
           </div>
         </div>
+
+        {/* Related Tools Section */}
+        <RelatedTools currentTool="tax-calculator" className="mt-8" />
       </div>
     </div>
   );
