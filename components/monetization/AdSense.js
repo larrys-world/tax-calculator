@@ -21,17 +21,46 @@ export const AdSenseAd = ({
   useEffect(() => {
     try {
       // Push ads when component mounts
-      if (window.adsbygoogle) {
+      if (window.adsbygoogle && client && slot && !client.includes('XXXX')) {
         window.adsbygoogle.push({});
       }
     } catch (err) {
       console.error('AdSense error:', err);
     }
-  }, []);
+  }, [client, slot]);
 
-  if (!client || !slot) {
-    console.warn('AdSense: Missing required props (client or slot)');
-    return null;
+  // Show placeholder when AdSense is not configured
+  if (!client || !slot || client.includes('XXXX') || slot.includes('XXXX')) {
+    return (
+      <div className={`adsense-placeholder ${className}`} style={style}>
+        <div 
+          style={{
+            backgroundColor: '#f8f9fa',
+            border: '2px dashed #dee2e6',
+            padding: '20px',
+            margin: '20px 0',
+            borderRadius: '8px',
+            minHeight: style.minHeight || '100px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            color: '#6c757d',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            textAlign: 'center'
+          }}
+        >
+          <div>
+            <div style={{ marginBottom: '8px', fontWeight: '600' }}>
+              Advertisement Space
+            </div>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>
+              AdSense will appear here once configured
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
