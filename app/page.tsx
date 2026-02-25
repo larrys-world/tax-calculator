@@ -1,10 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import monetization to avoid SSR issues
+const MonetizationWrapper = dynamic(
+  () => import('../components/monetization/MonetizationWrapper').then(mod => mod.MonetizationWrapper),
+  { ssr: false }
+);
+
+type FilingStatus = 'single' | 'marriedJointly';
 
 export default function TaxCalculator() {
   const [income, setIncome] = useState('');
-  const [filingStatus, setFilingStatus] = useState('single');
+  const [filingStatus, setFilingStatus] = useState<FilingStatus>('single');
   const [standardDeduction, setStandardDeduction] = useState(true);
   const [results, setResults] = useState<any>(null);
 
@@ -30,160 +39,137 @@ export default function TaxCalculator() {
     ]
   };
 
-  // 2024 Standard Deductions
   const standardDeductions = {
     single: 14600,
-    marriedJointly: 29200,
-    marriedSeparately: 14600,
-    headOfHousehold: 21900
+    marriedJointly: 29200
   };
 
   const calculateTax = () => {
     const grossIncome = parseFloat(income) || 0;
-    if (grossIncome <= 0) {
-      alert('Please enter a valid income amount');
-      return;
-    }
-
-    const deduction = standardDeduction ? standardDeductions[filingStatus as keyof typeof standardDeductions] : 0;
+    const deduction = standardDeduction ? standardDeductions[filingStatus] : 0;
     const taxableIncome = Math.max(0, grossIncome - deduction);
     
-    const brackets = filingStatus === 'marriedJointly' ? taxBrackets.marriedJointly : taxBrackets.single;
-    
+    const brackets = taxBrackets[filingStatus];
     let tax = 0;
     let previousMax = 0;
     
     for (const bracket of brackets) {
       if (taxableIncome > bracket.min) {
-        const taxableInThisBracket = Math.min(taxableIncome - bracket.min, bracket.max - bracket.min);
-        tax += taxableInThisBracket * bracket.rate;
+        const taxableInBracket = Math.min(taxableIncome - bracket.min, bracket.max - bracket.min);
+        tax += taxableInBracket * bracket.rate;
       }
     }
     
     const afterTaxIncome = grossIncome - tax;
-    const effectiveRate = (tax / grossIncome) * 100;
+    const effectiveRate = grossIncome > 0 ? (tax / grossIncome) * 100 : 0;
     
     setResults({
       grossIncome,
       deduction,
       taxableIncome,
-      federalTax: tax,
+      tax,
       afterTaxIncome,
-      effectiveRate,
-      monthlyTakeHome: afterTaxIncome / 12
+      effectiveRate
     });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white shadow-xl rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">2024 Federal Tax Calculator</h1>
+    <MonetizationWrapper>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">
+            Free Tax Calculator 2024
+          </h1>
           
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="income" className="block text-sm font-medium text-gray-700">
-                Annual Gross Income
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
+          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Annual Income
+                </label>
                 <input
                   type="number"
-                  name="income"
-                  id="income"
-                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-3 sm:text-sm border-gray-300 rounded-md"
-                  placeholder="75,000"
                   value={income}
                   onChange={(e) => setIncome(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter your annual income"
                 />
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="filing-status" className="block text-sm font-medium text-gray-700">
-                Filing Status
-              </label>
-              <select
-                id="filing-status"
-                name="filing-status"
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                value={filingStatus}
-                onChange={(e) => setFilingStatus(e.target.value)}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filing Status
+                </label>
+                <select
+                  value={filingStatus}
+                  onChange={(e) => setFilingStatus(e.target.value as FilingStatus)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="single">Single</option>
+                  <option value="marriedJointly">Married Filing Jointly</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="standardDeduction"
+                  checked={standardDeduction}
+                  onChange={(e) => setStandardDeduction(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="standardDeduction" className="ml-2 block text-sm text-gray-700">
+                  Use Standard Deduction (${standardDeductions[filingStatus].toLocaleString()})
+                </label>
+              </div>
+              
+              <button
+                onClick={calculateTax}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition duration-200 font-medium"
               >
-                <option value="single">Single</option>
-                <option value="marriedJointly">Married Filing Jointly</option>
-                <option value="marriedSeparately">Married Filing Separately</option>
-                <option value="headOfHousehold">Head of Household</option>
-              </select>
+                Calculate Tax
+              </button>
             </div>
-
-            <div className="flex items-center">
-              <input
-                id="standard-deduction"
-                name="standard-deduction"
-                type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                checked={standardDeduction}
-                onChange={(e) => setStandardDeduction(e.target.checked)}
-              />
-              <label htmlFor="standard-deduction" className="ml-2 block text-sm text-gray-900">
-                Use Standard Deduction
-              </label>
-            </div>
-
-            <button
-              onClick={calculateTax}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Calculate Tax
-            </button>
+            
+            {results && (
+              <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+                <h2 className="text-xl font-semibold mb-4 text-gray-800">Results</h2>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Gross Income:</span>
+                    <span className="font-medium">${results.grossIncome.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Standard Deduction:</span>
+                    <span className="font-medium">-${results.deduction.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Taxable Income:</span>
+                    <span className="font-medium">${results.taxableIncome.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Federal Tax:</span>
+                    <span className="font-medium">-${results.tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-green-600 text-lg font-semibold pt-3 border-t">
+                    <span>After-Tax Income:</span>
+                    <span>${results.afterTaxIncome.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Effective Tax Rate:</span>
+                    <span>{results.effectiveRate.toFixed(2)}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-
-          {results && (
-            <div className="mt-8 bg-gray-50 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Tax Calculation Results</h2>
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600">Gross Income:</dt>
-                  <dd className="text-sm font-medium text-gray-900">${results.grossIncome.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600">Standard Deduction:</dt>
-                  <dd className="text-sm font-medium text-gray-900">-${results.deduction.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600">Taxable Income:</dt>
-                  <dd className="text-sm font-medium text-gray-900">${results.taxableIncome.toLocaleString()}</dd>
-                </div>
-                <div className="flex justify-between pt-3 border-t border-gray-200">
-                  <dt className="text-sm font-semibold text-gray-900">Federal Tax:</dt>
-                  <dd className="text-sm font-semibold text-red-600">${results.federalTax.toFixed(2)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm font-semibold text-gray-900">After-Tax Income:</dt>
-                  <dd className="text-sm font-semibold text-green-600">${results.afterTaxIncome.toFixed(2)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600">Effective Tax Rate:</dt>
-                  <dd className="text-sm font-medium text-gray-900">{results.effectiveRate.toFixed(2)}%</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600">Monthly Take-Home:</dt>
-                  <dd className="text-sm font-medium text-gray-900">${results.monthlyTakeHome.toFixed(2)}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
-
-          <div className="mt-8 text-xs text-gray-500">
-            <p>* This calculator provides estimates for 2024 federal income tax only.</p>
-            <p>* State taxes, FICA taxes, and other deductions are not included.</p>
-            <p>* Consult a tax professional for personalized advice.</p>
+          
+          <div className="mt-8 max-w-2xl mx-auto text-center text-sm text-gray-600">
+            <p>This calculator provides estimates based on 2024 federal tax brackets.</p>
+            <p>Consult a tax professional for personalized advice.</p>
           </div>
         </div>
       </div>
-    </div>
+    </MonetizationWrapper>
   );
 }
